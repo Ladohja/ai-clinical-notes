@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import requests
-import tempfile
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -14,7 +13,6 @@ PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 def transcribe_audio(audio_path):
     headers = {"authorization": ASSEMBLY_AI_KEY}
     upload_url = "https://api.assemblyai.com/v2/upload"
-
     with open(audio_path, "rb") as f:
         response = requests.post(upload_url, headers=headers, files={"file": f})
     audio_url = response.json()["upload_url"]
@@ -53,7 +51,7 @@ Example SOAP Note:
 """
 
     prompt = f"""
-Convert the following doctor-patient conversation into a structured SOAP Note.
+Convert the following doctor-patient conversation into a structured SOAP Note:
 Include patient name and visit date in the output.
 
 Patient Name: {patient_name}
@@ -96,14 +94,14 @@ with st.form("patient_info"):
         patient_name = st.text_input("Patient Name")
     with col2:
         visit_date = st.date_input("Date of Visit", value=datetime.today())
-    audio_file = st.file_uploader("📤 Upload recorded audio (.m4a or .mp3)", type=["m4a", "mp3"])
+    audio_file = st.file_uploader("📤 Upload recorded audio (.mp3 only)", type=["mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
 if submitted and audio_file:
-    # Save uploaded file to a temporary location
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as tmp_file:
-        tmp_file.write(audio_file.read())
-        audio_path = tmp_file.name
+    with open(audio_file.name, "wb") as f:
+        f.write(audio_file.read())
+
+    audio_path = audio_file.name
 
     with st.spinner("Transcribing audio..."):
         transcript = transcribe_audio(audio_path)
