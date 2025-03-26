@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import requests
-import subprocess
+import tempfile
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -10,20 +10,11 @@ load_dotenv()
 ASSEMBLY_AI_KEY = os.getenv("ASSEMBLY_AI_KEY")
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 
-# Convert audio to MP3
-def convert_audio_to_mp3(input_path, output_path):
-    try:
-        command = f"ffmpeg -i \"{input_path}\" \"{output_path}\" -y"
-        subprocess.run(command, shell=True, check=True)
-        return output_path
-    except subprocess.CalledProcessError:
-        st.error("Audio conversion failed.")
-        return None
-
 # Transcribe audio with AssemblyAI
 def transcribe_audio(audio_path):
     headers = {"authorization": ASSEMBLY_AI_KEY}
     upload_url = "https://api.assemblyai.com/v2/upload"
+
     with open(audio_path, "rb") as f:
         response = requests.post(upload_url, headers=headers, files={"file": f})
     audio_url = response.json()["upload_url"]
@@ -108,21 +99,16 @@ with st.form("patient_info"):
     audio_file = st.file_uploader("📤 Upload recorded audio (.m4a or .mp3)", type=["m4a", "mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
-import tempfile
-
 if submitted and audio_file:
-    # Save uploaded file to a temporary directory
+    # Save uploaded file to a temporary location
     with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as tmp_file:
         tmp_file.write(audio_file.read())
-        temp_input_path = tmp_file.name
+        audio_path = tmp_file.name
 
-    mp3_path = temp_input_path.replace(".m4a", ".mp3")
-    audio_path = convert_audio_to_mp3(temp_input_path, mp3_path)
+    with st.spinner("Transcribing audio..."):
+        transcript = transcribe_audio(audio_path)
 
-    if audio_path:
-        with st.spinner("Transcribing audio..."):
-            transcript = transcribe_audio(audio_path)
-
+    if "failed" not in transcript.lower():
         st.subheader("📝 Transcription:")
         st.write(transcript)
 
@@ -132,4 +118,4 @@ if submitted and audio_file:
         st.subheader("📋 SOAP Note:")
         st.markdown(soap_note.replace("-", "\n-"))
     else:
-        st.error("❌ Audio conversion failed.")
+        st.error("❌ Transcription failed.")
