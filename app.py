@@ -108,23 +108,28 @@ with st.form("patient_info"):
     audio_file = st.file_uploader("📤 Upload recorded audio (.m4a or .mp3)", type=["m4a", "mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
+import tempfile
+
 if submitted and audio_file:
-    with open(audio_file.name, "wb") as f:
-        f.write(audio_file.read())
+    # Save uploaded file to a temporary directory
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as tmp_file:
+        tmp_file.write(audio_file.read())
+        temp_input_path = tmp_file.name
 
-    audio_path = audio_file.name
-    if audio_file.name.endswith(".m4a"):
-        mp3_path = audio_file.name.replace(".m4a", ".mp3")
-        audio_path = convert_audio_to_mp3(audio_file.name, mp3_path)
+    mp3_path = temp_input_path.replace(".m4a", ".mp3")
+    audio_path = convert_audio_to_mp3(temp_input_path, mp3_path)
 
-    with st.spinner("Transcribing audio..."):
-        transcript = transcribe_audio(audio_path)
+    if audio_path:
+        with st.spinner("Transcribing audio..."):
+            transcript = transcribe_audio(audio_path)
 
-    st.subheader("📝 Transcription:")
-    st.write(transcript)
+        st.subheader("📝 Transcription:")
+        st.write(transcript)
 
-    with st.spinner("Generating SOAP note..."):
-        soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"))
+        with st.spinner("Generating SOAP note..."):
+            soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"))
 
-    st.subheader("📄 SOAP Note:")
-    st.markdown(soap_note.replace("-", "\n-"))
+        st.subheader("📋 SOAP Note:")
+        st.markdown(soap_note.replace("-", "\n-"))
+    else:
+        st.error("❌ Audio conversion failed.")
