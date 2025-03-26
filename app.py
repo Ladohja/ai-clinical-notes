@@ -3,6 +3,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime
+import tempfile
 
 # Load environment variables
 load_dotenv()
@@ -51,7 +52,7 @@ Example SOAP Note:
 """
 
     prompt = f"""
-Convert the following doctor-patient conversation into a structured SOAP Note:
+Convert the following doctor-patient conversation into a structured SOAP Note.
 Include patient name and visit date in the output.
 
 Patient Name: {patient_name}
@@ -98,15 +99,14 @@ with st.form("patient_info"):
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
 if submitted and audio_file:
-    with open(audio_file.name, "wb") as f:
-        f.write(audio_file.read())
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+        tmp_file.write(audio_file.read())
+        audio_path = tmp_file.name
 
-    audio_path = audio_file.name
+    if audio_path:
+        with st.spinner("Transcribing audio..."):
+            transcript = transcribe_audio(audio_path)
 
-    with st.spinner("Transcribing audio..."):
-        transcript = transcribe_audio(audio_path)
-
-    if "failed" not in transcript.lower():
         st.subheader("📝 Transcription:")
         st.write(transcript)
 
@@ -115,5 +115,13 @@ if submitted and audio_file:
 
         st.subheader("📋 SOAP Note:")
         st.markdown(soap_note.replace("-", "\n-"))
+
+        # Download button
+        st.download_button(
+            label="⬇️ Download SOAP Note as .txt",
+            data=soap_note,
+            file_name=f"SOAP_Note_{patient_name.replace(' ', '_')}_{visit_date}.txt",
+            mime="text/plain"
+        )
     else:
-        st.error("❌ Transcription failed.")
+        st.error("❌ Audio file could not be saved.")
