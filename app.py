@@ -31,7 +31,7 @@ def transcribe_audio(audio_path):
             return "Transcription failed."
 
 # Generate SOAP Note using Perplexity + Few-shot Example
-def generate_soap_notes(transcribed_text, patient_name, visit_date):
+def generate_soap_notes(transcribed_text, patient_name, visit_date, doctor_name, doctor_specialty):
     headers = {
         "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
         "Content-Type": "application/json"
@@ -54,10 +54,11 @@ Example SOAP Note:
 
     prompt = f"""
 Convert the following doctor-patient conversation into a structured SOAP Note.
-Include patient name and visit date in the output.
+Include patient name, visit date, doctor's name, and specialty in the output.
 
 Patient Name: {patient_name}
 Date of Visit: {visit_date}
+Doctor: Dr. {doctor_name}, {doctor_specialty}
 
 {few_shot_example}
 
@@ -97,8 +98,10 @@ with st.form("patient_info"):
     col1, col2 = st.columns(2)
     with col1:
         patient_name = st.text_input("Patient Name")
+        doctor_name = st.text_input("Doctor Name")
     with col2:
         visit_date = st.date_input("Date of Visit", value=datetime.today())
+        doctor_specialty = st.text_input("Doctor's Specialty")
     audio_file = st.file_uploader("📤 Upload recorded audio (.mp3 only)", type=["mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
@@ -116,7 +119,13 @@ if submitted and audio_file:
         st.write(transcript)
 
         with st.spinner("🔄 Generating SOAP note..."):
-            soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"))
+            soap_note = generate_soap_notes(
+                transcript,
+                patient_name,
+                visit_date.strftime("%Y-%m-%d"),
+                doctor_name,
+                doctor_specialty
+            )
 
         st.success("📄 SOAP Note ready!")
         st.subheader("📋 SOAP Note:")
