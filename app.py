@@ -4,6 +4,7 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime
 import tempfile
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -67,7 +68,7 @@ Return only the SOAP Note.
 """
 
     body = {
-        "model": "sonar-pro",
+        "model": "sonar-pro",  
         "messages": [
             {"role": "system", "content": "You are a helpful AI medical assistant that generates SOAP notes from doctor-patient conversations."},
             {"role": "user", "content": prompt}
@@ -89,6 +90,9 @@ Return only the SOAP Note.
 st.set_page_config(page_title="AI Clinical Note Generator", layout="centered")
 st.title("🩺 AI-Powered Clinical Note Generator")
 
+st.sidebar.markdown("## Customize")
+st.sidebar.toggle("Wide Mode")
+
 with st.form("patient_info"):
     col1, col2 = st.columns(2)
     with col1:
@@ -103,25 +107,26 @@ if submitted and audio_file:
         tmp_file.write(audio_file.read())
         audio_path = tmp_file.name
 
-    if audio_path:
-        with st.spinner("Transcribing audio..."):
-            transcript = transcribe_audio(audio_path)
+    with st.spinner("⏳ Transcribing audio..."):
+        transcript = transcribe_audio(audio_path)
 
+    if "failed" not in transcript.lower():
+        st.success("✅ Transcription completed!")
         st.subheader("📝 Transcription:")
         st.write(transcript)
 
-        with st.spinner("Generating SOAP note..."):
+        with st.spinner("🔄 Generating SOAP note..."):
             soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"))
 
+        st.success("📄 SOAP Note ready!")
         st.subheader("📋 SOAP Note:")
         st.markdown(soap_note.replace("-", "\n-"))
 
         # Download button
-        st.download_button(
-            label="⬇️ Download SOAP Note as .txt",
-            data=soap_note,
-            file_name=f"SOAP_Note_{patient_name.replace(' ', '_')}_{visit_date}.txt",
-            mime="text/plain"
-        )
+        b64 = base64.b64encode(soap_note.encode()).decode()
+        href = f'<a href="data:file/txt;base64,{b64}" download="soap_note.txt">📥 Download SOAP Note</a>'
+        st.markdown(href, unsafe_allow_html=True)
+
+        st.toast("SOAP note ready to download!", icon="🎉")
     else:
-        st.error("❌ Audio file could not be saved.")
+        st.error("❌ Transcription failed.")
