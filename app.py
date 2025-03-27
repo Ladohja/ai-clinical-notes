@@ -131,6 +131,18 @@ if submitted and audio_file:
         st.subheader("📋 SOAP Note:")
         st.markdown(soap_note.replace("-", "\n-"))
 
+        # 🔍 Check if follow-up is mentioned in the SOAP note
+        follow_up_keywords = ["follow-up", "review", "re-evaluate", "monitor", "reassess"]
+        follow_up_required = any(keyword.lower() in soap_note.lower() for keyword in follow_up_keywords)
+
+        # 🚦 Show follow-up status
+        st.markdown("### 🗓️ Follow-up Recommendation")
+        if follow_up_required:
+            st.success("✅ This patient requires a follow-up appointment.")
+        else:
+            st.info("ℹ️ No follow-up required at this time.")
+
+
         # Download button
         b64 = base64.b64encode(soap_note.encode()).decode()
         href = f'<a href="data:file/txt;base64,{b64}" download="soap_note.txt">📥 Download SOAP Note</a>'
