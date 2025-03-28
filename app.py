@@ -50,15 +50,19 @@ Example SOAP Note:
 - Objective: No objective findings mentioned.
 - Assessment: Possible viral illness.
 - Plan: Recommend rest, fluids, and follow-up if symptoms worsen.
+- Follow-up: Yes, if symptoms worsen.
 """
 
     prompt = f"""
 Convert the following doctor-patient conversation into a structured SOAP Note.
-Include patient name, visit date, doctor's name, and specialty in the output.
+Include patient name, visit date, doctor name, and specialty in the output.
+If a SOAP section cannot be inferred from the conversation, include "Not Mentioned" for that section. Do not hallucinate information or use external knowledge. Only use what the doctor said.
+At the end, include a line for Follow-up recommendation. If unsure, say "Follow-up: Not mentioned."
 
+Doctor Name: {doctor_name}
+Specialty: {doctor_specialty}
 Patient Name: {patient_name}
 Date of Visit: {visit_date}
-Doctor: Dr. {doctor_name}, {doctor_specialty}
 
 {few_shot_example}
 
@@ -71,7 +75,7 @@ Return only the SOAP Note.
     body = {
         "model": "sonar-pro",  
         "messages": [
-            {"role": "system", "content": "You are a helpful AI medical assistant that generates SOAP notes from doctor-patient conversations."},
+            {"role": "system", "content": "You are a helpful AI medical assistant that generates SOAP notes from doctor-patient conversations. SOAP refers to Subjective, Objective, Assessment, Plan – not messaging protocols."},
             {"role": "user", "content": prompt}
         ]
     }
@@ -94,14 +98,17 @@ st.title("🩺 AI-Powered Clinical Note Generator")
 st.sidebar.markdown("## Customize")
 st.sidebar.toggle("Wide Mode")
 
+st.info("Note: All SOAP notes are generated solely from the audio conversation.")
+st.warning("Disclaimer: This note reflects only the doctor's perspective and not the patient's.")
+
 with st.form("patient_info"):
     col1, col2 = st.columns(2)
     with col1:
         patient_name = st.text_input("Patient Name")
         doctor_name = st.text_input("Doctor Name")
     with col2:
+        doctor_specialty = st.text_input("Doctor Specialty")
         visit_date = st.date_input("Date of Visit", value=datetime.today())
-        doctor_specialty = st.text_input("Doctor's Specialty")
     audio_file = st.file_uploader("📤 Upload recorded audio (.mp3 only)", type=["mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
@@ -119,29 +126,11 @@ if submitted and audio_file:
         st.write(transcript)
 
         with st.spinner("🔄 Generating SOAP note..."):
-            soap_note = generate_soap_notes(
-                transcript,
-                patient_name,
-                visit_date.strftime("%Y-%m-%d"),
-                doctor_name,
-                doctor_specialty
-            )
+            soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"), doctor_name, doctor_specialty)
 
         st.success("📄 SOAP Note ready!")
         st.subheader("📋 SOAP Note:")
         st.markdown(soap_note.replace("-", "\n-"))
-
-        # 🔍 Check if follow-up is mentioned in the SOAP note
-        follow_up_keywords = ["follow-up", "review", "re-evaluate", "monitor", "reassess"]
-        follow_up_required = any(keyword.lower() in soap_note.lower() for keyword in follow_up_keywords)
-
-        # 🚦 Show follow-up status
-        st.markdown("### 🗓️ Follow-up Recommendation")
-        if follow_up_required:
-            st.success("✅ This patient requires a follow-up appointment.")
-        else:
-            st.info("ℹ️ No follow-up required at this time.")
-
 
         # Download button
         b64 = base64.b64encode(soap_note.encode()).decode()
