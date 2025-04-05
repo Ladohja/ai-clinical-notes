@@ -39,25 +39,27 @@ def generate_soap_notes(transcribed_text, patient_name, visit_date, doctor_name,
 
     few_shot_example = """
 Example Conversation:
-Patient: I've been feeling very tired lately.
-Doctor: How long has this been happening?
-Patient: For about a week. I also have a headache.
-Doctor: Any fever?
-Patient: A slight fever yesterday.
+Doctor: How long have you had the [unintelligible]?
+Patient: Just 2 days.
 
 Example SOAP Note:
-- Subjective: Patient reports fatigue for one week and headache. Slight fever occurred yesterday.
-- Objective: No objective findings mentioned.
-- Assessment: Possible viral illness.
-- Plan: Recommend rest, fluids, and follow-up if symptoms worsen.
-- Follow-up: Yes, if symptoms worsen.
+- Subjective: Patient reports an unclear symptom for 2 days.
+- Objective: Not Mentioned.
+- Assessment: Not Mentioned.
+- Plan: Not Mentioned.
+- Follow-up: Not Mentioned.
 """
 
     prompt = f"""
 Convert the following doctor-patient conversation into a structured SOAP Note.
-Include patient name, visit date, doctor name, and specialty in the output.
-If a SOAP section cannot be inferred from the conversation, include "Not Mentioned" for that section. Do not hallucinate information or use external knowledge. Only use what the doctor said.
-At the end, include a line for Follow-up recommendation. If unsure, say "Follow-up: Not mentioned."
+Instructions:
+- Use **only** the provided conversation.
+- Include: patient name, visit date, doctor name, and specialty in the SOAP Note.
+- Base your analysis on what the **doctor said or inferred** — not the patient’s claims alone.
+- **Do not use external knowledge** or hallucinate treatments, findings, or advice.
+- If any SOAP section is unclear or cannot be determined, mark it as **"Not Mentioned"**.
+- If you encounter parts of the transcription marked as [unintelligible], do not attempt to guess the content. Instead, clearly state “Unclear” or “Not understood.”
+- Add a final line for follow-up recommendation: e.g., “Follow-up: Yes, in 1 week” or “Follow-up: Not Mentioned.”
 
 Doctor Name: {doctor_name}
 Specialty: {doctor_specialty}
@@ -73,7 +75,7 @@ Return only the SOAP Note.
 """
 
     body = {
-        "model": "sonar-pro",  
+        "model": "sonar-pro",
         "messages": [
             {"role": "system", "content": "You are a helpful AI medical assistant that generates SOAP notes from doctor-patient conversations. SOAP refers to Subjective, Objective, Assessment, Plan – not messaging protocols."},
             {"role": "user", "content": prompt}
@@ -112,31 +114,45 @@ with st.form("patient_info"):
     audio_file = st.file_uploader("📤 Upload recorded audio (.mp3 only)", type=["mp3"])
     submitted = st.form_submit_button("🚀 Generate SOAP Note")
 
-if submitted and audio_file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-        tmp_file.write(audio_file.read())
-        audio_path = tmp_file.name
-
-    with st.spinner("⏳ Transcribing audio..."):
-        transcript = transcribe_audio(audio_path)
-
-    if "failed" not in transcript.lower():
-        st.success("✅ Transcription completed!")
-        st.subheader("📝 Transcription:")
-        st.write(transcript)
-
-        with st.spinner("🔄 Generating SOAP note..."):
-            soap_note = generate_soap_notes(transcript, patient_name, visit_date.strftime("%Y-%m-%d"), doctor_name, doctor_specialty)
-
-        st.success("📄 SOAP Note ready!")
-        st.subheader("📋 SOAP Note:")
-        st.markdown(soap_note.replace("-", "\n-"))
-
-        # Download button
-        b64 = base64.b64encode(soap_note.encode()).decode()
-        href = f'<a href="data:file/txt;base64,{b64}" download="soap_note.txt">📥 Download SOAP Note</a>'
-        st.markdown(href, unsafe_allow_html=True)
-
-        st.toast("SOAP note ready to download!", icon="🎉")
+if submitted:
+    if not all([patient_name, doctor_name, doctor_specialty, audio_file]):
+        st.error("❌ Please fill in all fields and upload an audio file.")
     else:
-        st.error("❌ Transcription failed.")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tmp_file.write(audio_file.read())
+            audio_path = tmp_file.name
+
+        with st.spinner("⏳ Transcribing audio..."):
+            transcript = transcribe_audio(audio_path)
+
+        if "failed" not in transcript.lower():
+            st.success("✅ Transcription completed!")
+            st.subheader("📝 Transcription:")
+            st.write(transcript)
+
+            with st.spinner("🔄 Generating SOAP note..."):
+                soap_note = generate_soap_notes(
+                    transcript,
+                    patient_name,
+                    visit_date.strftime("%Y-%m-%d"),
+                    doctor_name,
+                    doctor_specialty
+                )
+
+            st.success("📄 SOAP Note ready!")
+            st.subheader("📋 SOAP Note:")
+            st.markdown(soap_note.replace("-", "\n-"))
+
+            # Download button
+            b64 = base64.b64encode(soap_note.encode()).decode()
+            href = f'<a href="data:file/txt;base64,{b64}" download="soap_note.txt">📥 Download SOAP Note</a>'
+            st.markdown(href, unsafe_allow_html=True)
+
+            # Feedback
+            feedback = st.radio("🩺 How accurate is the generated SOAP note?", ["Excellent", "Good", "Fair", "Poor"])
+            st.info(f"Doctor's feedback: {feedback}")
+
+            st.toast("SOAP note ready to download!", icon="🎉")
+        else:
+            st.error("❌ Transcription failed.")
+
